@@ -1,0 +1,48 @@
+# Zara'ya hangi ağlardan erişilebildiğini ölçer.
+#
+# Zara'nın bot koruması veri merkezi IP'lerini engelliyor: Vercel (AWS) 403
+# alıyor, ev bağlantısı 200 alıyor. Bu iş, GitHub Actions'ın koştuğu Azure
+# ağının engelli olup olmadığını söylüyor.
+#
+# Elle çalıştırmak için: Actions sekmesi > "Zara erisim testi" > Run workflow
+
+name: Zara erisim testi
+
+on:
+  push:
+    paths:
+      - ".github/workflows/zara-erisim-testi.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cikis IP ve konum
+        run: |
+          echo "Bu makinenin dis IP'si:"
+          curl -s --max-time 15 https://api.ipify.org || echo "(alinamadi)"
+          echo
+          curl -s --max-time 15 https://ipinfo.io/json | head -c 400 || true
+          echo
+
+      - name: Zara - referans arama
+        run: |
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+          URL="https://www.zara.com/itxrest/1/search/store/11766/reference?reference=08059577&locale=tr_TR&scope=default&origin=search&ajax=true"
+          KOD=$(curl -s -o /tmp/ref.txt -w "%{http_code}" --max-time 25 \
+            -H "User-Agent: $UA" -H "Accept: application/json" \
+            -H "Accept-Language: tr-TR,tr;q=0.9" -H "Referer: https://www.zara.com/tr/tr/" "$URL")
+          echo "HTTP $KOD"
+          head -c 300 /tmp/ref.txt; echo
+          if [ "$KOD" = "200" ]; then echo "SONUC: ERISIM VAR"; else echo "SONUC: ENGELLI"; fi
+
+      - name: Zara - stok sorgusu
+        run: |
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+          URL="https://www.zara.com/api/storefront/1/stores/11766/products/id/580760534/availability"
+          KOD=$(curl -s -o /tmp/stok.txt -w "%{http_code}" --max-time 25 \
+            -H "User-Agent: $UA" -H "Accept: application/json" "$URL")
+          echo "HTTP $KOD"
+          head -c 300 /tmp/stok.txt; echo
+          if [ "$KOD" = "200" ]; then echo "SONUC: ERISIM VAR"; else echo "SONUC: ENGELLI"; fi
