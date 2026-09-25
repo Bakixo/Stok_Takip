@@ -1,0 +1,65 @@
+# Stok kontrolü — 15 dakikada bir.
+#
+# Neden burada: Zara'nın bot koruması AWS IP'lerini engelliyor (Vercel 403
+# alıyor), ama GitHub Actions'ın koştuğu Azure ağını engellemiyor. Ölçüldü.
+# Herkese açık repolarda Actions dakikası ücretsiz.
+#
+# Bu iş, kendi sunucunda çalışan worker'la aynı kodu (runCheckCycle)
+# tek seferlik modda çalıştırır.
+#
+# Gerekli secret'lar: Settings > Secrets and variables > Actions
+#   DATABASE_URL, ACCESS_PIN, SESSION_SECRET,
+#   SMTP_USER, SMTP_PASS, ADMIN_EMAIL, APP_URL
+
+name: Stok kontrol
+
+on:
+  schedule:
+    # Her 15 dakikada bir. GitHub yoğunlukta birkaç dakika geciktirebilir.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+# Önceki tur bitmediyse yenisini başlatma.
+concurrency:
+  group: stok-kontrol
+  cancel-in-progress: false
+
+jobs:
+  kontrol:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      DATABASE_PROVIDER: postgresql
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ACCESS_PIN: ${{ secrets.ACCESS_PIN }}
+      SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: "465"
+      SMTP_SECURE: "true"
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASS: ${{ secrets.SMTP_PASS }}
+      MAIL_FROM_NAME: Stokta
+      MAIL_REPLY_TO: ${{ secrets.SMTP_USER }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      MAIL_DRY_RUN: "false"
+      APP_URL: ${{ secrets.APP_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Bagimliliklar
+        run: npm ci
+
+      - name: Prisma istemcisi
+        run: |
+          node scripts/set-db-provider.mjs
+          npx prisma generate
+
+      - name: Stok kontrol turu
+        run: npm run worker:once
