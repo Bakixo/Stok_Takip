@@ -1,0 +1,51 @@
+{
+  "name": "stokta",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Zara Türkiye stok takip uygulaması",
+  "scripts": {
+    "dev": "next dev",
+    "build": "node scripts/set-db-provider.mjs && prisma generate && next build",
+    "start": "next start",
+    "db:provider": "node scripts/set-db-provider.mjs",
+    "worker": "tsx worker/index.ts",
+    "worker:once": "tsx worker/index.ts --once",
+    "dev:all": "node scripts/dev-all.mjs",
+    "start:all": "node scripts/dev-all.mjs start",
+    "db:push": "node scripts/set-db-provider.mjs && prisma db push",
+    "db:studio": "prisma studio",
+    "email:preview": "email dev --dir lib/mail/templates --port 3001",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "start:prod": "node scripts/start-production.mjs"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "@react-email/components": "1.0.12",
+    "framer-motion": "13.4.3",
+    "next": "16.3.6",
+    "node-cron": "4.6.0",
+    "nodemailer": "10.0.10",
+    "prisma": "^6.19.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "tsx": "4.23.15",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "22.18.11",
+    "@types/nodemailer": "7.0.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "playwright": "1.63.0",
+    "react-email": "6.11.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "vitest": "5.0.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

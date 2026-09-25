@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+/* ───────────────────────────────────────────────────────────
+   Stokta — tasarım belirteçleri
+   Siyah-beyaz ağırlıklı, bol boşluklu, tek vurgu rengi.
+   ─────────────────────────────────────────────────────────── */
+
+@theme {
+  /* Tipografi: zarif serif başlık + temiz sans gövde.
+     Değişkenler next/font tarafından layout.tsx'te tanımlanır. */
+  --font-display: var(--font-cormorant), ui-serif, Georgia, serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Durum renkleri — tek vurgu mantığı */
+  --color-stock: oklch(0.62 0.13 155); /* yumuşak yeşil: stokta */
+  --color-watching: oklch(0.72 0.15 75); /* kehribar: takipte */
+  --color-gone: oklch(0.58 0.02 260); /* nötr gri: tükendi */
+}
+
+/* Açık tema (varsayılan) */
+:root {
+  --bg: oklch(0.99 0 0);
+  --bg-elevated: oklch(1 0 0);
+  --bg-sunken: oklch(0.965 0 0);
+  --fg: oklch(0.15 0 0);
+  --fg-muted: oklch(0.44 0 0);
+  /* En açık metin tonu bile WCAG AA'yı (4.5:1) geçmeli — küçük punto
+     etiketlerde kullanılıyor. 0.55'in üstü bu zeminde kalıyor. */
+  --fg-subtle: oklch(0.55 0 0);
+  --border: oklch(0.9 0 0);
+  --border-strong: oklch(0.15 0 0);
+
+  color-scheme: light;
+}
+
+/* Koyu tema — sistem tercihi */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: oklch(0.145 0 0);
+    --bg-elevated: oklch(0.19 0 0);
+    --bg-sunken: oklch(0.12 0 0);
+    --fg: oklch(0.97 0 0);
+    --fg-muted: oklch(0.74 0 0);
+    /* Koyu zeminde 0.58 altı AA'yı geçmiyor. */
+    --fg-subtle: oklch(0.62 0 0);
+    --border: oklch(0.28 0 0);
+    --border-strong: oklch(0.97 0 0);
+
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-sunken: var(--bg-sunken);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    /* iOS'ta alt çubuk için güvenli alan */
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* Mobilde lastik bant kaydırmasını engelle */
+    overscroll-behavior-y: none;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+
+  /* Dokunmatik hedefler için görünür ama zarif odak halkası */
+  :focus-visible {
+    outline: 2px solid var(--fg);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Mobilde dokunma vurgusunu kaldır — kendi basma efektimiz var */
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Hareketi azalt tercihi açıksa animasyonları neredeyse kapat */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Yükleniyor iskeletleri için parıltı */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--bg-sunken);
+}
+
+.shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--fg) 6%, transparent),
+    transparent
+  );
+  animation: shimmer 1.8s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer::after {
+    animation: none;
+  }
+}

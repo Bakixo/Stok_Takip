@@ -1,0 +1,3 @@
+# Next.js statik dosya klasoru.
+# Su an bos; ikonlar app/icon.tsx tarafindan uretiliyor.
+# Dockerfile bu klasoru kopyaladigi icin var olmasi gerekiyor.

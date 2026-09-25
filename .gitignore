@@ -1,0 +1,43 @@
+# bağımlılıklar
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+build/
+next-env.d.ts
+
+# üretim
+dist/
+
+# ortam değişkenleri — gizli bilgiler
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# veritabanı
+*.db
+*.db-journal
+prisma/dev.db*
+prisma/migrations/dev/
+
+# keşif çıktıları (Faz 0) — büyük ve geçici
+recon/out/
+recon/node_modules/
+
+# günlükler
+*.log
+npm-debug.log*
+
+# editör / işletim sistemi
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# test
+coverage/

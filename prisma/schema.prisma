@@ -1,0 +1,102 @@
+// Stokta — veri şeması
+//
+// Sağlayıcı satırı `scripts/set-db-provider.mjs` tarafından DATABASE_PROVIDER'a
+// göre güncellenir (Prisma provider alanında env() kabul etmez).
+// Geliştirmede SQLite, canlıda Postgres.
+//
+// Not: `status` alanı Prisma enum'u değil String — SQLite enum desteklemiyor,
+// böylece aynı şema iki sağlayıcıda da çalışıyor. Geçerli değerler
+// lib/watch-status.ts içinde tiplenmiş durumda.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Prisma 6 kullanılıyor: bağlantı URL'i şemada kalabiliyor ve sorgu motoru
+// hazır ikili olarak geliyor (Windows'ta yerel derleme gerekmiyor).
+
+/// Kullanıcının izlediği tek bir "ürün + renk + beden" kombinasyonu.
+model Watch {
+  id String @id @default(cuid())
+
+  // --- Ürün kimliği ---
+  /// Renk varyantının Zara id'si; stok sorgusu bununla yapılır.
+  productId   String
+  /// Ürün ailesi referansı (ör. "08059577") — aynı ürünün tüm renkleri için ortak.
+  reference   String
+  productName String
+  imageUrl    String
+  productUrl  String
+  /// Takibe alındığı andaki fiyat (TL). Kartlarda ve mailde gösterilir.
+  price       Float
+
+  // --- Seçim ---
+  colorId   String
+  colorName String
+  /// Beden adı (XS, S, M, 38, ...)
+  size      String
+  /// Bedenin Zara SKU id'si; stok cevabında bununla eşleşiriz.
+  skuId     String
+  /// Kullanıcının seçtiği şehir (slug) — mağaza listesini göstermek için.
+  city      String
+
+  // --- Takip durumu ---
+  email  String
+  /// ACTIVE | FOUND | CANCELLED — bkz. lib/watch-status.ts
+  status String @default("ACTIVE")
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastCheckedAt DateTime?
+  /// Stok bulunduğunda damgalanır; tekrar mail atmamak için.
+  foundAt       DateTime?
+  /// Bulunduğu andaki stok durumu (in_stock / low_on_stock).
+  foundState    String?
+  /// 30 günlük "hâlâ takip edeyim mi?" hatırlatması en son ne zaman gitti.
+  renewalSentAt DateTime?
+
+  checkLogs CheckLog[]
+
+  /// Aynı kişi aynı kombinasyonu iki kez takibe alamaz.
+  @@unique([email, skuId])
+  /// Worker yalnızca aktif takipleri tarar.
+  @@index([status, lastCheckedAt])
+  /// Ürün bazlı gruplama (dedupe) için.
+  @@index([productId])
+}
+
+/// Her stok kontrolünün kaydı — /admin sayfasındaki hata oranı buradan hesaplanır.
+model CheckLog {
+  id        String   @id @default(cuid())
+  watchId   String
+  watch     Watch    @relation(fields: [watchId], references: [id], onDelete: Cascade)
+  checkedAt DateTime @default(now())
+  /// Zara'nın döndürdüğü stok durumu ya da "error".
+  result    String
+  error     String?
+
+  @@index([checkedAt])
+  @@index([watchId, checkedAt])
+}
+
+/// Worker turlarının özeti — art arda hata sayısını buradan takip ederiz.
+model WorkerRun {
+  id         String    @id @default(cuid())
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  /// Bu turda kontrol edilen benzersiz ürün sayısı.
+  productCount Int     @default(0)
+  /// Stok bulunan takip sayısı.
+  foundCount   Int     @default(0)
+  /// Hata alan istek sayısı.
+  errorCount   Int     @default(0)
+  /// Tur tamamen başarısız olduysa (ör. Zara engeli) sebebi.
+  failureReason String?
+
+  @@index([startedAt])
+}

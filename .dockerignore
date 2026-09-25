@@ -1,0 +1,37 @@
+# Konteyner imajına girmemesi gerekenler.
+#
+# En önemlisi .env: gizli bilgiler imaja gömülmemeli, çalışma anında
+# platformun (Railway/Render) ortam değişkenlerinden gelmeli.
+
+.env
+.env.local
+.env.*.local
+
+node_modules
+.next
+out
+dist
+
+# Yerel SQLite veritabanı — canlıda Postgres kullanılıyor
+*.db
+*.db-journal
+prisma/dev.db*
+
+# Faz 0 keşif betikleri ve çıktıları: üretimde gereksiz
+recon
+
+# Geliştirme dosyaları
+.git
+.gitignore
+.vscode
+.idea
+coverage
+tests
+*.log
+npm-debug.log*
+
+# Dokümantasyon
+README.md
+FAZ0-RAPOR.md
+AGENTS.md
+CLAUDE.md
