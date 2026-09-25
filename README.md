@@ -113,6 +113,10 @@ gönderilmez, konsola yazılır.
 Yardımcı betikler:
 
 ```powershell
+# Hoş geldin mailini gönder (not .env içindeki WELCOME_NOTE'tan gelir)
+npx tsx scripts/send-welcome.mts firuze@ornek.com
+npx tsx scripts/send-welcome.mts firuze@ornek.com --dry   # göndermeden önizle
+
 # Mailleri HTML olarak dosyaya çıkar
 npx tsx scripts/preview-mails.mts
 
