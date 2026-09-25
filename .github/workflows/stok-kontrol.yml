@@ -13,10 +13,19 @@
 
 name: Stok kontrol
 
+# NOT: Zamanlama bilerek kapalı.
+#
+# Uygulama şu an ev bilgisayarında çalışıyor ve worker orada dönüyor.
+# Buradaki zamanlamayı da açarsak iki worker aynı takibi aynı anda
+# "stokta" bulup AYNI MAİLİ İKİ KEZ gönderebilir.
+#
+# İleride uygulama sürekli açık bir cihaza taşınmazsa ve arka plan
+# kontrolünü buraya devretmek istersen: aşağıdaki schedule satırlarını
+# yorumdan çıkar, evdeki worker'ı kapat ve DATABASE_URL secret'ını
+# Supabase'e çevir (SQLite'a buradan erişilemez).
 on:
-  schedule:
-    # Her 15 dakikada bir. GitHub yoğunlukta birkaç dakika geciktirebilir.
-    - cron: "*/15 * * * *"
+  # schedule:
+  #   - cron: "*/15 * * * *"
   workflow_dispatch:
 
 # Önceki tur bitmediyse yenisini başlatma.
