@@ -26,23 +26,40 @@ jobs:
           curl -s --max-time 15 https://ipinfo.io/json | head -c 400 || true
           echo
 
-      - name: Zara - referans arama
+      # Sonuç işin başarı durumuna kodlanıyor: log'lar yalnızca repo
+      # yöneticisine açık olduğu için, yeşil/kırmızı dışarıdan okunabilsin.
+      #   basarili (yesil) = Zara bu agdan erisilebilir
+      #   basarisiz (kirmizi) = engelli
+      - name: Zara erisim kontrolu
         run: |
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-          URL="https://www.zara.com/itxrest/1/search/store/11766/reference?reference=08059577&locale=tr_TR&scope=default&origin=search&ajax=true"
-          KOD=$(curl -s -o /tmp/ref.txt -w "%{http_code}" --max-time 25 \
-            -H "User-Agent: $UA" -H "Accept: application/json" \
-            -H "Accept-Language: tr-TR,tr;q=0.9" -H "Referer: https://www.zara.com/tr/tr/" "$URL")
-          echo "HTTP $KOD"
-          head -c 300 /tmp/ref.txt; echo
-          if [ "$KOD" = "200" ]; then echo "SONUC: ERISIM VAR"; else echo "SONUC: ENGELLI"; fi
+          REF="https://www.zara.com/itxrest/1/search/store/11766/reference?reference=08059577&locale=tr_TR&scope=default&origin=search&ajax=true"
+          STOK="https://www.zara.com/api/storefront/1/stores/11766/products/id/580760534/availability"
 
-      - name: Zara - stok sorgusu
-        run: |
-          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-          URL="https://www.zara.com/api/storefront/1/stores/11766/products/id/580760534/availability"
-          KOD=$(curl -s -o /tmp/stok.txt -w "%{http_code}" --max-time 25 \
-            -H "User-Agent: $UA" -H "Accept: application/json" "$URL")
-          echo "HTTP $KOD"
-          head -c 300 /tmp/stok.txt; echo
-          if [ "$KOD" = "200" ]; then echo "SONUC: ERISIM VAR"; else echo "SONUC: ENGELLI"; fi
+          K1=$(curl -s -o /tmp/ref.txt -w "%{http_code}" --max-time 25 \
+            -H "User-Agent: $UA" -H "Accept: application/json" \
+            -H "Accept-Language: tr-TR,tr;q=0.9" -H "Referer: https://www.zara.com/tr/tr/" "$REF")
+          K2=$(curl -s -o /tmp/stok.txt -w "%{http_code}" --max-time 25 \
+            -H "User-Agent: $UA" -H "Accept: application/json" "$STOK")
+
+          echo "referans arama : HTTP $K1"
+          head -c 250 /tmp/ref.txt; echo
+          echo "stok sorgusu   : HTTP $K2"
+          head -c 250 /tmp/stok.txt; echo
+
+          {
+            echo "## Zara erisim testi"
+            echo ""
+            echo "| Endpoint | HTTP |"
+            echo "|---|---|"
+            echo "| referans arama | $K1 |"
+            echo "| stok sorgusu | $K2 |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$K1" = "200" ] && [ "$K2" = "200" ]; then
+            echo "SONUC: ERISIM VAR" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          else
+            echo "SONUC: ENGELLI" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
