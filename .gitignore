@@ -32,6 +32,14 @@ recon/node_modules/
 *.log
 npm-debug.log*
 
+# derleme artıkları
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# yapay zekâ araçlarının yerel ayarları
+.claude/
+.agents/
+
 # editör / işletim sistemi
 .vscode/*
 !.vscode/extensions.json

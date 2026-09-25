@@ -23,6 +23,8 @@
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "@react-email/components": "1.0.12",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.117.1",
     "framer-motion": "13.4.3",
     "next": "16.3.6",
     "node-cron": "4.6.0",

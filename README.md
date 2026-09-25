@@ -125,70 +125,119 @@ node scripts/detect-store-cities.mjs
 
 ---
 
-## Canlıya alma (Railway)
+## Canlıya alma (Vercel — ücretsiz)
 
-Web ve worker tek bir Node servisi olarak çalışır; `Dockerfile` hazır.
+Vercel sürekli çalışan bir süreç barındırmaz, bu yüzden stok kontrolü
+`node-cron` yerine bir uç noktadan tetiklenir: `/api/kontrol`. Ücretsiz bir
+cron servisi bu adresi 15 dakikada bir çağırır. Aynı `runCheckCycle` kodu
+çalışır; yalnızca tetikleyici değişir.
+
+Toplam maliyet: **0 TL** (Vercel Hobby + Supabase Free + cron-job.org).
 
 ### 1. Veritabanı (Supabase)
 
-Supabase'de proje aç, sonra **Project Settings → Database → Connection string**.
+Panelde üstteki **Connect** butonu → **Direct** sekmesi. İki adres lazım:
 
-Üç seçenek çıkar; **Session pooler** olanı seç:
+**Uygulama için — Transaction pooler (port 6543):**
 
 ```
-postgresql://postgres.<proje-ref>:<ŞİFRE>@aws-0-<bölge>.pooler.supabase.com:5432/postgres
+postgresql://postgres.<ref>:<ŞİFRE>@aws-0-<bölge>.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
 ```
 
-Neden bu: *Direct connection* yeni projelerde yalnızca IPv6 üzerinden çalışıyor
-ve Railway IPv4 kullanıyor. *Transaction pooler* (port 6543) ise açılıştaki
-`prisma db push` ile uyumsuz. Session pooler ikisini de çözüyor.
+Serverless ortam çok sayıda kısa ömürlü bağlantı açar; Supabase bunun için
+transaction pooler'ı öneriyor. `pgbouncer=true` Prisma'nın prepared statement
+kullanmasını kapatır (transaction modu desteklemiyor), `connection_limit=1`
+her fonksiyon örneğinin tek bağlantı açmasını sağlar.
 
-Şifrende `@ : / ?` gibi karakterler varsa URL-kodlaması gerekir (`@` → `%40`).
-En kolayı Supabase'den şifreyi sıfırlayıp sadece harf-rakam seçmek.
+**Tabloları oluşturmak için — Session pooler (port 5432):**
 
-### 2. Railway
+Tabloları bir kez kendi bilgisayarından oluşturursun, Vercel'de migration
+çalışmaz:
 
-1. [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**
-   (projeyi önce GitHub'a yükle).
-2. Railway `Dockerfile`'ı kendisi bulur.
-3. **Variables** sekmesinde şunları gir:
+```powershell
+node scripts/test-db-connection.mjs
+```
+
+Session pooler adresini verirsin; betik bağlanır, tabloları kurar ve şemayı
+yerel `sqlite` ayarına geri alır.
+
+### 2. Cron sırrı
+
+`/api/kontrol` uç noktasını korumak için bir sır üret:
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
+```
+
+### 3. Vercel
+
+1. [vercel.com](https://vercel.com) → **Add New → Project** → GitHub reposunu seç.
+2. Framework otomatik **Next.js** algılanır; derleme ayarlarına dokunma.
+3. **Environment Variables** bölümüne şunları gir:
 
    ```
    DATABASE_PROVIDER = postgresql
-   DATABASE_URL      = postgresql://... (Neon'dan aldığın)
+   DATABASE_URL      = (transaction pooler adresi, ?pgbouncer=true ile)
    ACCESS_PIN        = ...
    SESSION_SECRET    = ...
    SMTP_USER         = ...
    SMTP_PASS         = ...
    ADMIN_EMAIL       = ...
-   APP_URL           = https://<railway-verdiği-adres>
    MAIL_FROM_NAME    = Stokta
-   CRON_SCHEDULE     = */15 * * * *
-   WELCOME_NOTE      = (hediye notun, isteğe bağlı)
+   MAIL_DRY_RUN      = false
+   CRON_SECRET       = (2. adımdaki sır)
+   APP_URL           = https://<proje>.vercel.app
    ```
 
-4. **Settings → Networking → Generate Domain** ile adres al, `APP_URL`'i o
-   adresle güncelle ve yeniden dağıt.
+   `APP_URL`'i Vercel'in vereceği adresle doldur. Adresi baştan bilmiyorsan
+   önce deploy et, adresi gör, sonra değişkeni güncelleyip yeniden dağıt.
 
-Konteyner açılışta `scripts/start-production.mjs` çalışır: önce
-`prisma db push` ile tablolar oluşur, sonra web ve worker başlar. Elle
-migration çalıştırman gerekmez.
+4. **Deploy**.
 
-Loglarda şunları görmelisin:
+### 4. Cron kurulumu
 
+[cron-job.org](https://cron-job.org) üzerinde ücretsiz hesap aç → **Create cronjob**:
+
+| Alan | Değer |
+|---|---|
+| URL | `https://<proje>.vercel.app/api/kontrol` |
+| Schedule | Every 15 minutes |
+| Request method | GET |
+| Header | `Authorization: Bearer <CRON_SECRET>` |
+
+Header eklemek istemezsen adresin sonuna `?key=<CRON_SECRET>` de yazabilirsin;
+uç nokta ikisini de kabul eder.
+
+Kaydettikten sonra **Test run** ile dene. Şuna benzer bir cevap dönmeli:
+
+```json
+{"ok":true,"productCount":2,"foundCount":0,"errorCount":0,"durationMs":9310}
 ```
-[start] veritabanı şeması uygulanıyor...
-[web] ▲ Next.js 16.3.6
-[worker] [worker] başladı — zamanlama: */15 * * * *
-```
 
-### Render / Fly.io
+`401` alıyorsan sır uyuşmuyor. `productCount` hep 0 ise aktif takip yoktur.
 
-Aynı `Dockerfile` çalışır. Render'da **New → Web Service → Docker**, Fly'da
-`fly launch --dockerfile Dockerfile`. Değişkenler yukarıdakiyle aynı.
+### Süre sınırı
 
-> **Vercel kullanma.** Ücretsiz planın cron'u 15 dakikada bir çalışmıyor ve
-> kalıcı bir worker süreci barındırmıyor.
+Vercel'in ücretsiz planında bir fonksiyon en fazla 300 saniye çalışır. Tur,
+süre dolmadan durup kalan ürünleri bir sonraki tura bırakır — takipler en
+eski kontrolden başlayarak sıralandığı için hiçbiri aç kalmaz. Cevaptaki
+`skippedCount` kaç ürünün ertelendiğini söyler; sürekli sıfırdan büyükse
+cron sıklığını artırabilirsin.
+
+### Alternatif: Docker (Railway / Render / Fly)
+
+Sürekli çalışan bir süreç barındırabilen bir platform kullanacaksan
+`Dockerfile` hazır: web ve worker aynı konteynerde çalışır, `node-cron`
+kendi içinde döner, `/api/kontrol` ve dış cron gerekmez.
+
+Açılışta `scripts/start-production.mjs` çalışır: önce eksik ortam
+değişkeni var mı kontrol eder, sonra `prisma db push` ile tabloları kurar,
+ardından web ve worker'ı başlatır. Bu senaryoda **Session pooler** (port
+5432) adresini kullan — `pgbouncer=true` gerekmez.
+
+> Bu platformların ücretsiz planları bu uygulamaya yetmiyor: Railway'in
+> Free planı ayda $1 kredi ve 0.5 GB veriyor (uygulama ~330 MB kullanıyor),
+> Render'ın ücretsiz web servisi 15 dakika hareketsizlikte uykuya geçiyor.
 
 ---
 
@@ -221,7 +270,10 @@ app/
     admin/             worker sağlığı
   giris/             PIN girişi
   takip/[id]/durdur/ mailden gelen "takibi durdur" linki
-  api/               beden ve mağaza uçları
+  api/
+    bedenler/          bir rengin bedenleri + canlı stok
+    magazalar/         şehirdeki Zara mağazaları
+    kontrol/           stok kontrolünü dışarıdan tetikler (cron çağırır)
   actions/           takip oluştur / iptal et
 
 lib/

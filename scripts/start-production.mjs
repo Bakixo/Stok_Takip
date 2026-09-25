@@ -29,6 +29,53 @@ const PRISMA = binary("node_modules/prisma/build/index.js", "prisma");
 const NEXT = binary("node_modules/next/dist/bin/next", "next");
 const TSX = binary("node_modules/tsx/dist/cli.mjs", "tsx");
 
+// --- 0) Ortam değişkenleri tam mı? ---
+// Eksik bir değişken uygulamayı zaten çökertir; asıl sorun log'da bunun
+// yığın izi (stack trace) olarak görünüp anlaşılmaması. Burada önden
+// kontrol edip okunur bir liste basıyoruz.
+const REQUIRED = [
+  ["DATABASE_PROVIDER", 'veritabanı türü — canlıda "postgresql"'],
+  ["DATABASE_URL", "Postgres bağlantı adresi"],
+  ["ACCESS_PIN", "uygulamaya giriş kodu"],
+  ["SESSION_SECRET", "oturum imza anahtarı (en az 16 karakter)"],
+  ["SMTP_USER", "Gmail adresi"],
+  ["SMTP_PASS", "Gmail uygulama şifresi"],
+  ["ADMIN_EMAIL", "hata uyarılarının gideceği adres"],
+  ["APP_URL", "uygulamanın tam adresi, https:// ile — maillerdeki linkler buna göre kurulur"],
+];
+
+const eksik = REQUIRED.filter(([key]) => !process.env[key]?.trim());
+
+if (eksik.length > 0) {
+  console.error("\n" + "=".repeat(60));
+  console.error(` EKSİK ORTAM DEĞİŞKENİ (${eksik.length} adet)`);
+  console.error("=".repeat(60));
+  for (const [key, aciklama] of eksik) {
+    console.error(`  ${key}`);
+    console.error(`      ${aciklama}`);
+  }
+  console.error("=".repeat(60));
+  console.error(" Bunları platformun Variables/Environment bölümüne ekle,");
+  console.error(" sonra yeniden dağıt.\n");
+  process.exit(1);
+}
+
+// APP_URL biçimi maillerdeki linkleri doğrudan etkiliyor; erken uyar.
+const appUrl = process.env.APP_URL.trim();
+if (!/^https?:\/\//.test(appUrl)) {
+  console.error(`\nAPP_URL "https://" ile başlamalı. Şu an: "${appUrl}"\n`);
+  process.exit(1);
+}
+if (appUrl.includes("localhost")) {
+  console.warn(
+    `\n[uyarı] APP_URL localhost'u gösteriyor (${appUrl}).\n` +
+      `        Maillerdeki linkler alıcının telefonunda açılmaz.\n`,
+  );
+}
+if (appUrl.endsWith("/")) {
+  console.warn(`[uyarı] APP_URL sonunda / var; linklerde çift eğik çizgi oluşur.`);
+}
+
 // --- 1) Şemayı veritabanına uygula ---
 // Migration dosyası tutmuyoruz; şema tek kaynak. İlk açılışta tabloları
 // oluşturur, sonraki açılışlarda şema zaten uyumluysa hiçbir şey yapmaz.

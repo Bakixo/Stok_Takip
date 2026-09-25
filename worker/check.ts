@@ -19,10 +19,25 @@ export interface RunSummary {
   errorCount: number;
   /** Tur tamamen başarısız olduysa sebebi (ör. bot engeli). */
   failureReason?: string;
+  /** Süre dolduğu için kontrol edilemeyen ürün sayısı. */
+  skippedCount?: number;
 }
 
-export async function runCheckCycle(): Promise<RunSummary> {
+export interface CycleOptions {
+  /**
+   * Turun kullanabileceği en uzun süre (ms).
+   *
+   * Serverless ortamda (Vercel) fonksiyonun sert bir zaman sınırı var;
+   * süre dolmadan durup kalanları bir sonraki tura bırakıyoruz. Takipler
+   * en eski kontrolden başlayarak sıralandığı için hiçbiri aç kalmıyor.
+   * Verilmezse sınır yok (kendi sunucunda çalışan worker böyle kullanır).
+   */
+  budgetMs?: number;
+}
+
+export async function runCheckCycle(options: CycleOptions = {}): Promise<RunSummary> {
   const startedAt = new Date();
+  const deadline = options.budgetMs ? Date.now() + options.budgetMs : Infinity;
   const run = await prisma.workerRun.create({ data: { startedAt } });
 
   const summary: RunSummary = { productCount: 0, foundCount: 0, errorCount: 0 };
@@ -30,6 +45,8 @@ export async function runCheckCycle(): Promise<RunSummary> {
   try {
     const watches = await prisma.watch.findMany({
       where: { status: "ACTIVE" },
+      // En uzun süredir kontrol edilmeyen önce gelsin: süre dolup tur
+      // yarıda kesilse bile sıra herkese geliyor.
       orderBy: { lastCheckedAt: { sort: "asc", nulls: "first" } },
     });
 
@@ -50,7 +67,15 @@ export async function runCheckCycle(): Promise<RunSummary> {
       `[worker] ${watches.length} takip, ${byProduct.size} benzersiz ürün sorgulanacak`,
     );
 
+    let skipped = 0;
     for (const [productId, group] of byProduct) {
+      // Zara isteği arası bekleme ~2-8 sn; bir istek daha sığmayacaksa dur.
+      if (Date.now() + 10_000 > deadline) {
+        skipped = byProduct.size - summary.productCount;
+        console.log(`[worker] süre doldu, ${skipped} ürün sonraki tura bırakıldı`);
+        break;
+      }
+
       summary.productCount++;
       const checkedAt = new Date();
 
@@ -125,6 +150,7 @@ export async function runCheckCycle(): Promise<RunSummary> {
       }
     }
 
+    if (skipped > 0) summary.skippedCount = skipped;
     return summary;
   } finally {
     await prisma.workerRun.update({
