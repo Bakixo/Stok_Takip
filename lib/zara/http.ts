@@ -85,6 +85,29 @@ interface FetchOptions {
   referer?: string;
 }
 
+/**
+ * İstek doğrudan mı gidecek, aracı üzerinden mi?
+ *
+ * Zara'nın bot koruması AWS IP'lerini engelliyor; uygulama Vercel'de
+ * (AWS) çalıştığı için oradan Zara'ya erişilemiyor. ZARA_PROXY_URL
+ * tanımlıysa istekler Cloudflare'deki aracıya yönlendirilir — o ağ
+ * engelli değil (ölçüldü).
+ *
+ * Değişkenler tanımlı değilse hiçbir şey değişmez ve istek doğrudan
+ * gider; yerelde geliştirirken durum budur.
+ */
+function hedefle(url: string): { url: string; headers: Record<string, string> } {
+  const proxy = process.env.ZARA_PROXY_URL?.trim();
+  const key = process.env.ZARA_PROXY_SECRET?.trim();
+  if (!proxy || !key) return { url, headers: {} };
+
+  const base = proxy.replace(/\/+$/, "");
+  return {
+    url: `${base}/?u=${encodeURIComponent(url)}`,
+    headers: { "X-Proxy-Key": key },
+  };
+}
+
 /** Cevabın Akamai engeli olup olmadığını anlar. */
 function detectBlock(status: number, body: string): boolean {
   if (status === 403) return true;
@@ -104,8 +127,12 @@ export async function zaraFetchJson<T>(url: string, opts: FetchOptions = {}): Pr
     // Her deneme kuyruktan ayrı geçer; böylece tekrarlar da hız sınırına uyar.
     const outcome = await enqueue(async (): Promise<{ ok: true; data: T } | { ok: false; err: ZaraError }> => {
       try {
-        const res = await fetch(url, {
-          headers: referer ? { ...BASE_HEADERS, Referer: referer } : BASE_HEADERS,
+        const hedef = hedefle(url);
+        const res = await fetch(hedef.url, {
+          headers: {
+            ...(referer ? { ...BASE_HEADERS, Referer: referer } : BASE_HEADERS),
+            ...hedef.headers,
+          },
           signal: AbortSignal.timeout(timeoutMs),
         });
         const text = await res.text();
