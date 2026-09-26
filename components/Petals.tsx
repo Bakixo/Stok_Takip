@@ -4,22 +4,32 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 
 /**
- * Uygulama açılışında bir kez düşen yaprak animasyonu.
+ * Uygulama açılışında bir kez düşen çiçek animasyonu.
  *
  * Tasarım notları:
  *  - Oturumda tek sefer. Her gezinmede tekrarlarsa süs olmaktan çıkıp
  *    engel olur; sessionStorage ile bir kereye indiriliyor.
- *  - Sakin ve az sayıda: 14 yaprak, düşük opaklık, yavaş düşüş. Uygulamanın
- *    siyah-beyaz editoryal diline karışmasın diye pudra/krem tonları.
- *  - Tıklamayı engellemez (pointer-events: none) ve ekran okuyucuya görünmez.
+ *  - Gerçek çiçek formu (beş yapraklı, ortası sarı) ve canlı renkler.
+ *  - Tıklamayı engellemez (pointer-events: none), ekran okuyucuya görünmez.
  *  - "Hareketi azalt" açıksa hiç çalışmaz.
  */
 
-const ANAHTAR = "stokta:yapraklar";
-/** Yaprak sayısı: az olsun ki şirin değil zarif dursun. */
-const ADET = 14;
+const ANAHTAR = "stokta:cicekler";
+/** Şenlikli ama kalabalık olmayan bir sayı. */
+const ADET = 22;
 
-interface Yaprak {
+/** Canlı ama birbiriyle uyumlu bir palet. */
+const RENKLER = [
+  { yaprak: "#f2789f", goz: "#ffd166" }, // pembe
+  { yaprak: "#f6a5c0", goz: "#ffe08a" }, // açık pembe
+  { yaprak: "#b892d8", goz: "#ffd166" }, // lila
+  { yaprak: "#ff9f68", goz: "#ffe08a" }, // şeftali
+  { yaprak: "#8ecae6", goz: "#ffd166" }, // açık mavi
+  { yaprak: "#fdfcf8", goz: "#f2b705" }, // krem
+  { yaprak: "#ef476f", goz: "#ffd166" }, // mercan
+];
+
+interface Cicek {
   id: number;
   sol: number;
   gecikme: number;
@@ -27,31 +37,52 @@ interface Yaprak {
   boyut: number;
   donus: number;
   savrulma: number;
-  renk: string;
+  renk: (typeof RENKLER)[number];
   opaklik: number;
 }
 
-/** Pudra, krem ve soluk gül tonları — vurgu renkleriyle yarışmayacak kadar soft. */
-const RENKLER = ["#f2d9d5", "#e8cfc6", "#f6e6de", "#e6cdd4", "#efdcd0"];
-
-function uret(): Yaprak[] {
+function uret(): Cicek[] {
   return Array.from({ length: ADET }, (_, i) => ({
     id: i,
     sol: Math.random() * 100,
-    gecikme: Math.random() * 2.2,
-    sure: 6 + Math.random() * 4,
-    boyut: 10 + Math.random() * 12,
-    donus: (Math.random() > 0.5 ? 1 : -1) * (180 + Math.random() * 360),
-    savrulma: (Math.random() - 0.5) * 120,
+    gecikme: Math.random() * 2.5,
+    sure: 6 + Math.random() * 4.5,
+    boyut: 16 + Math.random() * 16,
+    donus: (Math.random() > 0.5 ? 1 : -1) * (180 + Math.random() * 540),
+    savrulma: (Math.random() - 0.5) * 140,
     renk: RENKLER[i % RENKLER.length]!,
-    opaklik: 0.35 + Math.random() * 0.35,
+    opaklik: 0.75 + Math.random() * 0.25,
   }));
+}
+
+/** Beş yapraklı sade çiçek. */
+function CicekSvg({ yaprak, goz }: { yaprak: string; goz: string }) {
+  // Beş yaprak, 72 derece aralıkla.
+  const acilar = [0, 72, 144, 216, 288];
+  return (
+    <svg viewBox="0 0 40 40" width="100%" height="100%" aria-hidden focusable="false">
+      <g transform="translate(20 20)">
+        {acilar.map((a) => (
+          <ellipse
+            key={a}
+            cx="0"
+            cy="-11"
+            rx="6.5"
+            ry="9"
+            fill={yaprak}
+            transform={`rotate(${a})`}
+          />
+        ))}
+        <circle cx="0" cy="0" r="4.5" fill={goz} />
+      </g>
+    </svg>
+  );
 }
 
 export function Petals() {
   const azalt = useReducedMotion();
   const [goster, setGoster] = useState(false);
-  const yapraklar = useMemo(uret, []);
+  const cicekler = useMemo(uret, []);
 
   useEffect(() => {
     if (azalt) return;
@@ -62,8 +93,7 @@ export function Petals() {
       // Gizli sekmede depolama kapalı olabilir; animasyon yine de oynasın.
     }
     setGoster(true);
-    // En uzun yaprak (gecikme + süre) bitince kaldır.
-    const t = setTimeout(() => setGoster(false), 12_500);
+    const t = setTimeout(() => setGoster(false), 13_500);
     return () => clearTimeout(t);
   }, [azalt]);
 
@@ -72,38 +102,34 @@ export function Petals() {
   return (
     <AnimatePresence>
       {goster && (
-        <div
-          aria-hidden
-          className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
-        >
-          {yapraklar.map((y) => (
+        <div aria-hidden className="pointer-events-none fixed inset-0 z-30 overflow-hidden">
+          {cicekler.map((c) => (
             <motion.span
-              key={y.id}
-              initial={{ y: "-12vh", x: 0, rotate: 0, opacity: 0 }}
+              key={c.id}
+              initial={{ y: "-14vh", x: 0, rotate: 0, opacity: 0 }}
               animate={{
-                y: "112vh",
-                x: y.savrulma,
-                rotate: y.donus,
-                opacity: [0, y.opaklik, y.opaklik, 0],
+                y: "114vh",
+                x: c.savrulma,
+                rotate: c.donus,
+                opacity: [0, c.opaklik, c.opaklik, 0],
               }}
               exit={{ opacity: 0 }}
               transition={{
-                duration: y.sure,
-                delay: y.gecikme,
+                duration: c.sure,
+                delay: c.gecikme,
                 ease: "linear",
-                opacity: { times: [0, 0.12, 0.75, 1], duration: y.sure, delay: y.gecikme },
+                opacity: { times: [0, 0.1, 0.8, 1], duration: c.sure, delay: c.gecikme },
               }}
               style={{
                 position: "absolute",
-                left: `${y.sol}%`,
-                width: y.boyut,
-                height: y.boyut * 1.35,
-                background: y.renk,
-                // Yaprak formu: bir ucu sivri, diğeri yuvarlak.
-                borderRadius: "60% 0 60% 0",
+                left: `${c.sol}%`,
+                width: c.boyut,
+                height: c.boyut,
                 willChange: "transform, opacity",
               }}
-            />
+            >
+              <CicekSvg yaprak={c.renk.yaprak} goz={c.renk.goz} />
+            </motion.span>
           ))}
         </div>
       )}

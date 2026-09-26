@@ -99,6 +99,17 @@
   a {
     -webkit-tap-highlight-color: transparent;
   }
+
+  /*
+   * iOS Safari, yazı tipi 16 pikselden küçük bir alana odaklanınca sayfayı
+   * kendiliğinden yakınlaştırır ve geri çıkmaz. Bu yüzden tüm giriş
+   * alanlarında taban 16 piksel; daha küçüğü kullanma.
+   */
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1rem);
+  }
 }
 
 /* Hareketi azalt tercihi açıksa animasyonları neredeyse kapat */

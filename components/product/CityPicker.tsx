@@ -40,7 +40,7 @@ export function CityPicker({
         aria-label="Şehir ara"
         placeholder="Şehir ara"
         className="border-border focus:border-fg min-h-12 w-full border bg-transparent px-4
-                   text-[15px] outline-none transition-colors placeholder:text-[var(--fg-subtle)]"
+                   text-base outline-none transition-colors placeholder:text-[var(--fg-subtle)]"
       />
 
       <div className="mt-4 max-h-64 overflow-y-auto overscroll-contain">

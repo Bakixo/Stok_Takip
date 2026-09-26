@@ -58,7 +58,7 @@ export function EmailForm({ mevcut }: { mevcut: string | null }) {
           aria-describedby={state.error ? "eposta-hata" : undefined}
           aria-invalid={state.error ? true : undefined}
           className="border-border focus:border-fg min-h-14 w-full border bg-transparent px-4
-                     text-[15px] outline-none transition-colors
+                     text-base outline-none transition-colors
                      placeholder:text-[var(--fg-subtle)]"
         />
 

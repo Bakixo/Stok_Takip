@@ -56,7 +56,7 @@ export function SearchInput() {
           aria-label="Zara linki veya ürün kodu"
           aria-invalid={error ? true : undefined}
           placeholder="Zara linkini veya ürün kodunu yapıştır"
-          className="min-h-14 min-w-0 flex-1 bg-transparent px-4 text-[15px] outline-none
+          className="min-h-14 min-w-0 flex-1 bg-transparent px-4 text-base outline-none
                      placeholder:text-[var(--fg-subtle)]"
         />
         <button
