@@ -131,12 +131,37 @@ node scripts/detect-store-cities.mjs
 
 ## Canlıya alma (Vercel — ücretsiz)
 
-Vercel sürekli çalışan bir süreç barındırmaz, bu yüzden stok kontrolü
-`node-cron` yerine bir uç noktadan tetiklenir: `/api/kontrol`. Ücretsiz bir
-cron servisi bu adresi 15 dakikada bir çağırır. Aynı `runCheckCycle` kodu
-çalışır; yalnızca tetikleyici değişir.
+Toplam maliyet: **0 TL** (Vercel Hobby + Supabase Free + Cloudflare Workers +
+cron-job.org).
 
-Toplam maliyet: **0 TL** (Vercel Hobby + Supabase Free + cron-job.org).
+### Neden bu kurulum böyle — okumadan değiştirme
+
+Zara'nın bot koruması (Akamai) **veri merkezi IP'lerini engelliyor**. Ölçüldü:
+
+| Nereden | Zara |
+|---|---|
+| Ev bağlantısı (Türkiye) | 200 |
+| Vercel — AWS Virginia (`iad1`) | 403 |
+| Vercel — AWS Frankfurt (`fra1`) | 403 |
+| GitHub Actions (Azure) | 200 |
+| Cloudflare — Paris (CDG) | 403 |
+| Cloudflare — İstanbul (IST) | 200 |
+| **Cloudflare — Stockholm (ARN)** | **200** |
+
+Bu yüzden iki şey yapılıyor:
+
+1. **Zara istekleri Cloudflare Worker'ı üzerinden geçiyor** (`cloudflare/zara-proxy.js`).
+   Vercel'den Zara'ya doğrudan gidilemiyor.
+2. **Vercel `arn1` (Stockholm) bölgesinde çalışıyor** (`vercel.json`). Bölge,
+   Cloudflare'in hangi merkezinden çıkılacağını belirliyor; Frankfurt seçilirse
+   Cloudflare Paris'ten çıkar ve Zara yine engeller.
+
+> `vercel.json` içindeki `regions` değerini değiştirirsen Zara erişimi bozulabilir.
+> Değiştirmen gerekirse `scripts/bolge-dene.mjs` ile yeni bölgeyi ölç.
+
+Arka plan stok kontrolü `node-cron` yerine `/api/kontrol` ucundan tetikleniyor
+(Vercel sürekli süreç barındırmaz); ücretsiz bir cron servisi bu adresi 15
+dakikada bir çağırıyor. Aynı `runCheckCycle` kodu çalışır.
 
 ### 1. Veritabanı (Supabase)
 
@@ -165,7 +190,35 @@ node scripts/test-db-connection.mjs
 Session pooler adresini verirsin; betik bağlanır, tabloları kurar ve şemayı
 yerel `sqlite` ayarına geri alır.
 
-### 2. Cron sırrı
+### 2. Cloudflare aracısı
+
+Zara isteklerinin geçeceği worker. CLI gerekmez:
+
+1. [dash.cloudflare.com](https://dash.cloudflare.com) → **Workers & Pages** →
+   **Create** → **Start with Hello World!** → **Deploy**
+2. **Edit code** → `cloudflare/zara-proxy.js` içeriğini yapıştır → **Deploy**
+3. **Settings → Variables and Secrets** → tür **Secret**, ad `PROXY_KEY`,
+   değer uzun rastgele bir dize → **Deploy**
+
+Worker adresi Vercel'de `ZARA_PROXY_URL`, anahtar `ZARA_PROXY_SECRET` olacak.
+İkisi Cloudflare'deki `PROXY_KEY` ile birebir aynı olmalı.
+
+Aracının hem çalıştığını hem güvenli olduğunu sına:
+
+```powershell
+npx tsx scripts/test-proxy.mts https://<worker>.workers.dev <PROXY_KEY>
+```
+
+Anahtarsız istek 401, başka bir site 403 dönmeli — aracı yalnızca uygulamanın
+kullandığı dört Zara adresine izin verir, açık proxy değildir.
+
+Aracının hangi Cloudflare merkezinden çıktığını görmek için (anahtar gerekmez):
+
+```
+https://<worker>.workers.dev/?tani=1
+```
+
+### 3. Cron sırrı
 
 `/api/kontrol` uç noktasını korumak için bir sır üret:
 
@@ -173,7 +226,7 @@ yerel `sqlite` ayarına geri alır.
 node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
 ```
 
-### 3. Vercel
+### 4. Vercel
 
 1. [vercel.com](https://vercel.com) → **Add New → Project** → GitHub reposunu seç.
 2. Framework otomatik **Next.js** algılanır; derleme ayarlarına dokunma.
@@ -181,24 +234,34 @@ node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
 
    ```
    DATABASE_PROVIDER = postgresql
-   DATABASE_URL      = (transaction pooler adresi, ?pgbouncer=true ile)
+   DATABASE_URL      = (transaction pooler adresi, ?pgbouncer=true&connection_limit=1 ile)
    ACCESS_PIN        = ...
    SESSION_SECRET    = ...
+   SMTP_HOST         = smtp.gmail.com
+   SMTP_PORT         = 465
+   SMTP_SECURE       = true
    SMTP_USER         = ...
    SMTP_PASS         = ...
+   MAIL_REPLY_TO     = ...
    ADMIN_EMAIL       = ...
    MAIL_FROM_NAME    = Stokta
    MAIL_DRY_RUN      = false
-   CRON_SECRET       = (2. adımdaki sır)
+   CRON_SECRET       = (3. adımdaki sır)
    APP_URL           = https://<proje>.vercel.app
+   ZARA_PROXY_URL    = https://<worker>.workers.dev
+   ZARA_PROXY_SECRET = (Cloudflare'deki PROXY_KEY ile aynı)
    ```
 
    `APP_URL`'i Vercel'in vereceği adresle doldur. Adresi baştan bilmiyorsan
    önce deploy et, adresi gör, sonra değişkeni güncelleyip yeniden dağıt.
 
+   > Kutuları **boş bırakma**. Varsayılanlar yalnızca değişken hiç tanımlı
+   > değilse devreye giriyor; boş bir değer varsayılanı devre dışı bırakır
+   > (ör. `SMTP_PORT` boşsa 465 yerine 0 olur ve mail gitmez).
+
 4. **Deploy**.
 
-### 4. Cron kurulumu
+### 5. Cron kurulumu
 
 [cron-job.org](https://cron-job.org) üzerinde ücretsiz hesap aç → **Create cronjob**:
 
