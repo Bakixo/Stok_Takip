@@ -52,6 +52,37 @@ export default {
   async fetch(request, env) {
     if (request.method !== "GET") return hata("Yalnizca GET", 405);
 
+    const colo = request.cf?.colo ?? "bilinmiyor";
+
+    // --- Teshis modu: /?tani=1 ---
+    // Anahtar istemez cunku Zara'dan gelen veriyi DONDURMEZ; yalnizca
+    // "bu Cloudflare merkezinden Zara'ya erisiliyor mu" sorusunu cevaplar.
+    // Boylece farkli ulkelerden acip hangi merkezlerin engelli oldugu
+    // karsilastirilabiliyor.
+    if (new URL(request.url).searchParams.get("tani") === "1") {
+      const deneme =
+        "https://www.zara.com/api/storefront/1/stores/11766/products/id/580760534/availability";
+      let status = 0;
+      let engellendi = true;
+      try {
+        const r = await fetch(deneme, {
+          headers: {
+            "User-Agent": UA,
+            Accept: "application/json, text/plain, */*",
+            "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
+            Referer: "https://www.zara.com/tr/tr/",
+          },
+        });
+        status = r.status;
+        engellendi = r.status !== 200;
+      } catch {
+        status = 0;
+      }
+      return new Response(JSON.stringify({ colo, zaraStatus: status, engellendi }, null, 2), {
+        headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+      });
+    }
+
     // --- Yetki ---
     const beklenen = env.PROXY_KEY;
     if (!beklenen) return hata("PROXY_KEY tanimli degil", 500);
@@ -76,10 +107,6 @@ export default {
     if (!IZINLI_YOLLAR.some((kalip) => kalip.test(hedef.pathname))) {
       return hata("Bu yol izinli degil", 403);
     }
-
-    // Isteğin Cloudflare'in hangi veri merkezinden ciktigi. Akamai bazi
-    // merkezleri engelleyip bazilarini engellemedigi icin teshiste kritik.
-    const colo = request.cf?.colo ?? "bilinmiyor";
 
     // --- Zara'ya ilet ---
     try {
