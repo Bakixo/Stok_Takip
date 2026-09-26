@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getProductByReference, parseUserInput } from "@/lib/zara/client";
 import { ZaraError } from "@/lib/zara/http";
 import { ProductView } from "@/components/product/ProductView";
+import { requireEmail } from "@/lib/require-email";
 import type { ZaraProduct } from "@/lib/zara/types";
 
 export const metadata = { title: "Ürün · Stokta" };
@@ -13,6 +14,8 @@ interface Props {
 }
 
 export default async function ProductPage({ searchParams }: Props) {
+  // Bildirim adresi bir kez sorulur; takip formu artık e-posta istemiyor.
+  const email = await requireEmail();
   const { giris } = await searchParams;
 
   if (!giris) return <Problem title="Ürün belirtilmedi" detail="Ana sayfadan bir link ya da kod gir." />;
@@ -34,7 +37,9 @@ export default async function ProductPage({ searchParams }: Props) {
     return <Problem {...describeError(err)} />;
   }
 
-  return <ProductView product={product} preselectedColorId={preselectedColorId} />;
+  return (
+    <ProductView product={product} preselectedColorId={preselectedColorId} email={email} />
+  );
 }
 
 /** Hatayı kullanıcının anlayacağı dile çevirir. */

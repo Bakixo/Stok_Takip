@@ -16,9 +16,11 @@ interface Props {
   size: ZaraSize;
   citySlug: string;
   productUrl: string;
+  /** Bildirim adresi — girişte bir kez sorulup çerezde tutuluyor. */
+  email: string;
 }
 
-export function ResultPanel({ product, color, size, citySlug, productUrl }: Props) {
+export function ResultPanel({ product, color, size, citySlug, productUrl, email }: Props) {
   const city = findCity(citySlug);
   const available = isPurchasable(size.availability);
   const [stores, setStores] = useState<ZaraStore[] | null>(null);
@@ -113,6 +115,7 @@ export function ResultPanel({ product, color, size, citySlug, productUrl }: Prop
             size={size}
             citySlug={citySlug}
             productUrl={productUrl}
+            email={email}
           />
         </>
       )}

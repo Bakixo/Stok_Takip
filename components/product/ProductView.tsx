@@ -15,9 +15,11 @@ import { buildProductUrl, type ZaraProduct, type ZaraSize } from "@/lib/zara/typ
 interface Props {
   product: ZaraProduct;
   preselectedColorId?: string;
+  /** Bildirim adresi — girişte bir kez sorulup çerezde tutuluyor. */
+  email: string;
 }
 
-export function ProductView({ product, preselectedColorId }: Props) {
+export function ProductView({ product, preselectedColorId, email }: Props) {
   const [colorId, setColorId] = useState(preselectedColorId ?? product.colors[0]!.id);
   const [sizes, setSizes] = useState<ZaraSize[] | null>(null);
   const [sizeError, setSizeError] = useState<string | null>(null);
@@ -122,6 +124,7 @@ export function ProductView({ product, preselectedColorId }: Props) {
             size={selectedSize}
             citySlug={city}
             productUrl={buildProductUrl(product, color.productId)}
+            email={email}
           />
         )}
       </AnimatePresence>

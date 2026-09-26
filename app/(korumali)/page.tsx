@@ -2,12 +2,17 @@ import { prisma } from "@/lib/db";
 import { SearchInput } from "@/components/SearchInput";
 import { WatchList } from "@/components/WatchList";
 import { toWatchCard } from "@/lib/watch-card";
+import { requireEmail } from "@/lib/require-email";
+import { Petals } from "@/components/Petals";
 
 export const metadata = { title: "Stokta" };
 /** Takip listesi her girişte tazelensin. */
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
+  // Bildirim adresi yoksa önce onu sor.
+  await requireEmail();
+
   const watches = await prisma.watch.findMany({
     where: { status: { in: ["ACTIVE", "FOUND"] } },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
@@ -16,6 +21,7 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-12">
+      <Petals />
       <section className="pt-6">
         <h1 className="text-[2.75rem] leading-[1.05] text-balance">
           Beklediğin beden
