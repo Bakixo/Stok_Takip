@@ -62,6 +62,35 @@ async function probe(label: string, url: string) {
   }
 }
 
+/**
+ * Veritabanına gerçekten bağlanılıyor mu?
+ * Hata mesajı Next.js'in "digest" numarasının arkasında kaldığı için
+ * burada açıkça döndürülüyor.
+ */
+async function veritabani() {
+  const url = process.env.DATABASE_URL ?? "";
+  const bilgi = {
+    saglayici: process.env.DATABASE_PROVIDER ?? "(tanimsiz)",
+    port: url.match(/:(\d+)\//)?.[1] ?? "(yok)",
+    pgbouncer: url.includes("pgbouncer=true"),
+    host: url.match(/@([^:/?]+)/)?.[1] ?? "(yok)",
+  };
+
+  const basladi = Date.now();
+  try {
+    const { prisma } = await import("@/lib/db");
+    const sayi = await prisma.watch.count();
+    return { ...bilgi, baglanti: "OK", takipSayisi: sayi, ms: Date.now() - basladi };
+  } catch (err) {
+    return {
+      ...bilgi,
+      baglanti: "HATA",
+      ms: Date.now() - basladi,
+      hata: (err instanceof Error ? err.message : String(err)).slice(0, 500),
+    };
+  }
+}
+
 export async function GET(request: Request) {
   if (!authorized(request)) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
@@ -93,6 +122,15 @@ export async function GET(request: Request) {
   return NextResponse.json({
     disIp,
     bolge: process.env.VERCEL_REGION ?? process.env.AWS_REGION ?? "bilinmiyor",
-    sonuclar,
+    araci: {
+      tanimli: Boolean(process.env.ZARA_PROXY_URL?.trim()),
+      anahtarVar: Boolean(process.env.ZARA_PROXY_SECRET?.trim()),
+      adres: process.env.ZARA_PROXY_URL?.trim() ?? "(tanimsiz)",
+    },
+    appUrl: process.env.APP_URL ?? "(tanimsiz)",
+    veritabani: await veritabani(),
+    // Not: asagidaki istekler DOGRUDAN Zara'ya gider (araci kullanmaz),
+    // boylece ham engel durumu gorunur.
+    zaraDogrudan: sonuclar,
   });
 }
