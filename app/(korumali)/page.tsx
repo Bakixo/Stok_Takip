@@ -10,11 +10,13 @@ export const metadata = { title: "Stokta" };
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  // Bildirim adresi yoksa önce onu sor.
-  await requireEmail();
+  // Bildirim adresi yoksa önce onu sor; takipleri de bu adrese bağlıyoruz.
+  const email = await requireEmail();
 
   const watches = await prisma.watch.findMany({
-    where: { status: { in: ["ACTIVE", "FOUND"] } },
+    // Yalnızca kendi takipleri: uygulamayı birden fazla kişi aynı PIN'le
+    // kullanıyor, kimse başkasınınkini görmemeli.
+    where: { email, status: { in: ["ACTIVE", "FOUND"] } },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     take: 8,
   });

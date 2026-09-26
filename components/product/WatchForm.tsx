@@ -41,7 +41,7 @@ export function WatchForm({ product, color, size, citySlug, productUrl, email }:
       size: size.name,
       skuId: size.skuId,
       city: citySlug,
-      email,
+      // E-posta bilerek gönderilmiyor: sunucu onu imzalı çerezten okuyor.
     });
 
     if (result.ok) setStatus("done");

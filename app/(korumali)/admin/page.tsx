@@ -3,6 +3,7 @@
  * PIN korumalı (korumalı düzenin altında).
  */
 import { prisma } from "@/lib/db";
+import { requireAdmin } from "@/lib/require-admin";
 import { timeAgo } from "@/lib/tr";
 import { AVAILABILITY_LABEL, type Availability } from "@/lib/zara/types";
 
@@ -12,6 +13,9 @@ export const dynamic = "force-dynamic";
 const DAY = 24 * 60 * 60 * 1000;
 
 export default async function AdminPage() {
+  // Yalnızca ADMIN_EMAIL sahibine açık; PIN ortak olduğu için tek başına yetmez.
+  await requireAdmin();
+
   const since = new Date(Date.now() - DAY);
 
   const [active, found, cancelled, runs, logs, recentChecks, lastRun] = await Promise.all([

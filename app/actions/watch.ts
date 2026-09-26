@@ -2,11 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { hasSession } from "@/lib/auth";
+import { getEmail, hasSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { sendWatchConfirmed } from "@/lib/mail/notifications";
 import { findCity } from "@/lib/zara/cities";
 
+/**
+ * Takip girdisi.
+ *
+ * E-posta bilerek burada YOK: istemciden gelen adrese güvenmiyoruz.
+ * Adres, girişte sorulup imzalı çerezte tutulan değerden okunuyor —
+ * aksi hâlde PIN'i bilen biri istediği adrese bildirim kurabilirdi.
+ */
 const createSchema = z.object({
   productId: z.string().regex(/^\d+$/, "Geçersiz ürün"),
   reference: z.string().min(4),
@@ -19,7 +26,6 @@ const createSchema = z.object({
   size: z.string().min(1),
   skuId: z.string().regex(/^\d+$/, "Geçersiz beden"),
   city: z.string().min(1),
-  email: z.string().email("Geçerli bir e-posta gir"),
 });
 
 export type CreateWatchInput = z.infer<typeof createSchema>;
@@ -34,6 +40,9 @@ export interface ActionResult {
 export async function createWatch(input: CreateWatchInput): Promise<ActionResult> {
   if (!(await hasSession())) return { ok: false, error: "Oturum gerekli." };
 
+  const email = await getEmail();
+  if (!email) return { ok: false, error: "Önce e-posta adresini kaydet." };
+
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Girdi geçersiz." };
@@ -44,7 +53,7 @@ export async function createWatch(input: CreateWatchInput): Promise<ActionResult
 
   try {
     const watch = await prisma.watch.upsert({
-      where: { email_skuId: { email: data.email, skuId: data.skuId } },
+      where: { email_skuId: { email, skuId: data.skuId } },
       // Daha önce bulunmuş ya da iptal edilmişse yeniden izlemeye al.
       update: {
         status: "ACTIVE",
@@ -53,7 +62,7 @@ export async function createWatch(input: CreateWatchInput): Promise<ActionResult
         foundState: null,
         renewalSentAt: null,
       },
-      create: { ...data, status: "ACTIVE" },
+      create: { ...data, email, status: "ACTIVE" },
     });
 
     // Onay maili takibi bloklamasın: kayıt başarılı, mail gitmese de olur.
@@ -69,12 +78,27 @@ export async function createWatch(input: CreateWatchInput): Promise<ActionResult
   }
 }
 
-/** Takibi iptal eder (kayıt silinmez, durumu değişir). */
+/**
+ * Takibi iptal eder (kayıt silinmez, durumu değişir).
+ *
+ * Sahiplik kontrolü şart: uygulamayı birden fazla kişi aynı PIN'le
+ * kullanıyor, kimse başkasının takibini silememeli.
+ */
 export async function cancelWatch(id: string): Promise<ActionResult> {
   if (!(await hasSession())) return { ok: false, error: "Oturum gerekli." };
 
+  const email = await getEmail();
+  if (!email) return { ok: false, error: "Önce e-posta adresini kaydet." };
+
   try {
-    await prisma.watch.update({ where: { id }, data: { status: "CANCELLED" } });
+    const sonuc = await prisma.watch.updateMany({
+      // email koşulu sahiplik kontrolü: başkasının kaydı eşleşmez.
+      where: { id, email },
+      data: { status: "CANCELLED" },
+    });
+
+    if (sonuc.count === 0) return { ok: false, error: "Takip bulunamadı." };
+
     revalidatePath("/");
     revalidatePath("/takiplerim");
     return { ok: true };

@@ -2,13 +2,17 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { WatchesClient } from "./WatchesClient";
 import { toWatchCard } from "@/lib/watch-card";
+import { requireEmail } from "@/lib/require-email";
 
 export const metadata = { title: "Takiplerim · Stokta" };
 export const dynamic = "force-dynamic";
 
 export default async function WatchesPage() {
+  const email = await requireEmail();
+
   const watches = await prisma.watch.findMany({
-    where: { status: { in: ["ACTIVE", "FOUND"] } },
+    // Yalnızca kendi takipleri.
+    where: { email, status: { in: ["ACTIVE", "FOUND"] } },
     // Bulunanlar üstte (ACTIVE < FOUND alfabetik olduğu için açıkça sıralıyoruz).
     orderBy: [{ foundAt: "desc" }, { createdAt: "desc" }],
   });

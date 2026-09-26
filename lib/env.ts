@@ -12,8 +12,12 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL gerekli"),
 
   // --- Erişim ---
-  /** Arkadaşının uygulamaya girerken kullanacağı PIN. */
-  ACCESS_PIN: z.string().min(4, "ACCESS_PIN en az 4 haneli olmalı"),
+  /**
+   * Uygulamaya girerken kullanılan PIN.
+   * En az 6 hane: 4 hane yalnızca 10.000 olasılık demek ve kaba kuvvetle
+   * denenebilir; 6 hane bunu bir milyona çıkarıyor.
+   */
+  ACCESS_PIN: z.string().min(6, "ACCESS_PIN en az 6 haneli olmalı"),
   /** Oturum çerezini imzalamak için rastgele uzun bir dize. */
   SESSION_SECRET: z.string().min(16, "SESSION_SECRET en az 16 karakter olmalı"),
 

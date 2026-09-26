@@ -395,4 +395,18 @@ kendini günceller.
   sayfasına derin link ile yönlendirilerek yapılır.
 - Gizli bilgilerin hepsi `.env` içinde; bu dosya git'e girmez.
 - Oturum çerezi HMAC ile imzalanır, `httpOnly` ve üretimde `secure`.
-- PIN değişirse eski oturumlar kendiliğinden düşer.
+  PIN değişirse eski oturumlar kendiliğinden düşer.
+- **PIN en az 6 hane** olmalı; `lib/env.ts` bunu zorunlu tutar. 4 hane yalnızca
+  10.000 olasılık demek ve kaba kuvvetle denenebiliyor.
+- **Takipler kişiye bağlı.** Uygulamayı birden fazla kişi aynı PIN'le
+  kullanabildiği için bütün sorgular bildirim adresine göre filtrelenir;
+  kimse başkasının takibini göremez veya silemez.
+- **Bildirim adresi istemciden alınmaz.** Girişte bir kez sorulup imzalı
+  çerezte tutulur; takip oluşturulurken sunucu onu çerezten okur. Aksi hâlde
+  PIN'i bilen biri istediği adrese bildirim kurabilirdi.
+- **`/admin` yalnızca `ADMIN_EMAIL` sahibine açık.** PIN ortak olduğu için tek
+  başına yetmiyor; yetkisiz kullanıcıya 404 döner.
+- Cloudflare aracısı hem anahtarla korunur hem de yalnızca uygulamanın
+  kullandığı dört Zara adresine izin verir — açık proxy değildir.
+- Maildeki "takibi durdur" linki kimlik sormaz (tek tıkla çalışsın diye);
+  yapabildiği tek şey o takibi durdurmaktır.
