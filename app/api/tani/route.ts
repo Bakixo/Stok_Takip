@@ -91,6 +91,44 @@ async function veritabani() {
   }
 }
 
+/**
+ * Aracı üzerinden Zara'ya ulaşılıyor mu?
+ * lib/zara/http.ts ile birebir aynı adresi ve başlığı kurar, böylece
+ * "uygulama neden aracıyı kullanamıyor" sorusu doğrudan cevaplanır.
+ */
+async function araciTesti() {
+  const proxy = process.env.ZARA_PROXY_URL?.trim();
+  const key = process.env.ZARA_PROXY_SECRET?.trim();
+  if (!proxy || !key) return { durum: "ARACI TANIMSIZ", proxy: Boolean(proxy), key: Boolean(key) };
+
+  const hedef =
+    "https://www.zara.com/api/storefront/1/stores/11766/products/id/580760534/availability";
+  const url = `${proxy.replace(/\/+$/, "")}/?u=${encodeURIComponent(hedef)}`;
+
+  const basladi = Date.now();
+  try {
+    const res = await fetch(url, {
+      headers: { "X-Proxy-Key": key },
+      signal: AbortSignal.timeout(20000),
+    });
+    const govde = await res.text();
+    return {
+      durum: res.status === 200 ? "CALISIYOR" : "HATA",
+      status: res.status,
+      ms: Date.now() - basladi,
+      // Anahtar uzunlugu: iki tarafta ayni mi, degeri gostermeden kiyaslamak icin.
+      anahtarUzunlugu: key.length,
+      ozet: govde.slice(0, 200).replace(/\s+/g, " "),
+    };
+  } catch (err) {
+    return {
+      durum: "ULASILAMADI",
+      ms: Date.now() - basladi,
+      hata: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 export async function GET(request: Request) {
   if (!authorized(request)) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
@@ -129,6 +167,7 @@ export async function GET(request: Request) {
     },
     appUrl: process.env.APP_URL ?? "(tanimsiz)",
     veritabani: await veritabani(),
+    araciTesti: await araciTesti(),
     // Not: asagidaki istekler DOGRUDAN Zara'ya gider (araci kullanmaz),
     // boylece ham engel durumu gorunur.
     zaraDogrudan: sonuclar,
