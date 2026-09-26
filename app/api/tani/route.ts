@@ -118,6 +118,9 @@ async function araciTesti() {
       ms: Date.now() - basladi,
       // Anahtar uzunlugu: iki tarafta ayni mi, degeri gostermeden kiyaslamak icin.
       anahtarUzunlugu: key.length,
+      // Cloudflare'in hangi veri merkezinden ciktigi (aracinin yeni surumu doldurur).
+      cfColo: res.headers.get("x-cf-colo") ?? "(araci guncellenmemis)",
+      zaraStatus: res.headers.get("x-zara-status") ?? "-",
       ozet: govde.slice(0, 200).replace(/\s+/g, " "),
     };
   } catch (err) {

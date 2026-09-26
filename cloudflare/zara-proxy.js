@@ -77,6 +77,10 @@ export default {
       return hata("Bu yol izinli degil", 403);
     }
 
+    // Isteğin Cloudflare'in hangi veri merkezinden ciktigi. Akamai bazi
+    // merkezleri engelleyip bazilarini engellemedigi icin teshiste kritik.
+    const colo = request.cf?.colo ?? "bilinmiyor";
+
     // --- Zara'ya ilet ---
     try {
       const cevap = await fetch(hedef.toString(), {
@@ -97,10 +101,13 @@ export default {
         headers: {
           "content-type": cevap.headers.get("content-type") ?? "application/json",
           "cache-control": "no-store",
+          // Teshis: hangi merkezden cikildi, Zara ne dedi.
+          "x-cf-colo": String(colo),
+          "x-zara-status": String(cevap.status),
         },
       });
     } catch (err) {
-      return hata(`Zara'ya ulasilamadi: ${err}`, 502);
+      return hata(`Zara'ya ulasilamadi (colo=${colo}): ${err}`, 502);
     }
   },
 };
