@@ -16,7 +16,8 @@ export async function sendAdminAlert(failures: number, reason: string): Promise<
     `Muhtemel sebep: Zara endpoint'i değişmiş ya da istekler engellenmiş olabilir.\n` +
     `Kontrol: ${e.APP_URL}/admin\n`;
 
-  await sendMail({
+  await sendMail(
+    {
     to: e.ADMIN_EMAIL,
     subject,
     text,
@@ -24,7 +25,9 @@ export async function sendAdminAlert(failures: number, reason: string): Promise<
 <p>Son hata: <code>${escapeHtml(reason)}</code></p>
 <p>Muhtemel sebep: Zara endpoint'i değişmiş ya da istekler engellenmiş olabilir.</p>
 <p><a href="${e.APP_URL}/admin">Admin sayfasını aç</a></p>`,
-  });
+    },
+    { kind: "admin_alert" },
+  );
 
   console.log(`[worker] admin uyarısı gönderildi → ${e.ADMIN_EMAIL}`);
 }
@@ -55,7 +58,8 @@ export async function sendRenewalReminders(): Promise<void> {
       `Takibe devam etmemi istiyorsan bir şey yapmana gerek yok.\n` +
       `Durdurmak için: ${stop}\n`;
 
-    const ok = await sendMail({
+    const ok = await sendMail(
+      {
       to: w.email,
       subject,
       text,
@@ -64,7 +68,9 @@ export async function sendRenewalReminders(): Promise<void> {
 <p>Takibe devam etmemi istiyorsan bir şey yapmana gerek yok.</p>
 <p><a href="${stop}">Takibi durdur</a></p>`,
       unsubscribeUrl: stop,
-    });
+      },
+      { kind: "renewal", watchId: w.id },
+    );
 
     if (ok.ok) {
       await prisma.watch.update({

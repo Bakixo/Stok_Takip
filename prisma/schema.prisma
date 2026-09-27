@@ -84,6 +84,32 @@ model CheckLog {
   @@index([watchId, checkedAt])
 }
 
+/// Gönderilen her mailin kaydı.
+///
+/// Mailler sessizce kaybolmasın diye var: gönderim denemesi başarılı da olsa
+/// başarısız da olsa buraya yazılır. "Mail gitti mi?" sorusu tahminle değil
+/// kayıtla cevaplanır.
+model MailLog {
+  id        String   @id @default(cuid())
+  sentAt    DateTime @default(now())
+  /// Alıcı adresi.
+  to        String
+  subject   String
+  /// Hangi mail: stock_alert | watch_confirmed | welcome | renewal | admin_alert
+  kind      String
+  /// sent | dry_run | failed
+  status    String
+  /// Sağlayıcının verdiği kimlik (başarılıysa).
+  messageId String?
+  /// Başarısızsa sebebi.
+  error     String?
+  /// Varsa ilgili takip.
+  watchId   String?
+
+  @@index([sentAt])
+  @@index([status, sentAt])
+}
+
 /// Worker turlarının özeti — art arda hata sayısını buradan takip ederiz.
 model WorkerRun {
   id         String    @id @default(cuid())

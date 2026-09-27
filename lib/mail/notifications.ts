@@ -70,14 +70,20 @@ export async function sendStockAlert(
 
   const { html, text } = await renderMail(StockAlert(props), stockAlertText(props));
 
-  const result = await sendMail({
-    to: watch.email,
-    subject: `Stokta: ${watch.productName} (${watch.size}) — ${cityName}`,
-    html,
-    text,
-    unsubscribeUrl: props.unsubscribeUrl,
-  });
-  return result.ok;
+  const result = await sendMail(
+    {
+      to: watch.email,
+      subject: `Stokta: ${watch.productName} (${watch.size}) — ${cityName}`,
+      html,
+      text,
+      unsubscribeUrl: props.unsubscribeUrl,
+    },
+    { kind: "stock_alert", watchId: watch.id },
+  );
+
+  // Kuru modda mail GİTMEZ. Bunu başarı sayarsak takip "bulundu" diye
+  // kapanır ve kullanıcı hiç haber almaz — sessiz kayıp.
+  return result.ok && !result.dryRun;
 }
 
 /** "Takibe alındı" onayı. */
@@ -94,13 +100,16 @@ export async function sendWatchConfirmed(watch: Watch): Promise<boolean> {
 
   const { html, text } = await renderMail(WatchConfirmed(props), watchConfirmedText(props));
 
-  const result = await sendMail({
-    to: watch.email,
-    subject: `Takibe alındı: ${watch.productName} (${watch.size})`,
-    html,
-    text,
-    unsubscribeUrl: props.unsubscribeUrl,
-  });
+  const result = await sendMail(
+    {
+      to: watch.email,
+      subject: `Takibe alındı: ${watch.productName} (${watch.size})`,
+      html,
+      text,
+      unsubscribeUrl: props.unsubscribeUrl,
+    },
+    { kind: "watch_confirmed", watchId: watch.id },
+  );
   return result.ok;
 }
 
@@ -111,11 +120,9 @@ export async function sendWelcome(to: string): Promise<boolean> {
 
   const { html, text } = await renderMail(Welcome(props), welcomeText(props));
 
-  const result = await sendMail({
-    to,
-    subject: "Stokta'ya hoş geldin",
-    html,
-    text,
-  });
+  const result = await sendMail(
+    { to, subject: "Stokta'ya hoş geldin", html, text },
+    { kind: "welcome" },
+  );
   return result.ok;
 }

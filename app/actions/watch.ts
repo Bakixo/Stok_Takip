@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { getEmail, hasSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -65,9 +66,19 @@ export async function createWatch(input: CreateWatchInput): Promise<ActionResult
       create: { ...data, email, status: "ACTIVE" },
     });
 
-    // Onay maili takibi bloklamasın: kayıt başarılı, mail gitmese de olur.
-    void sendWatchConfirmed(watch).catch((err) => {
-      console.error("[watch] onay maili gönderilemedi:", err);
+    // Onay maili cevabı bekletmesin ama KAYBOLMASIN.
+    //
+    // Önceden `void sendWatchConfirmed(...)` deniyordu; Vercel gibi
+    // sunucusuz ortamlarda fonksiyon cevabı döndürür döndürmez
+    // dondurulabildiği için mail yarıda kalıyordu. `after()` tam bunun
+    // için var: iş, cevap gönderildikten sonra ama süreç canlıyken çalışır.
+    after(async () => {
+      try {
+        const gitti = await sendWatchConfirmed(watch);
+        if (!gitti) console.error(`[watch] onay maili gönderilemedi: ${watch.id}`);
+      } catch (err) {
+        console.error("[watch] onay maili hatası:", err);
+      }
     });
 
     revalidatePath("/");
