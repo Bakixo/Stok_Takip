@@ -3,8 +3,10 @@
  *
  *   npx tsx scripts/cron-durumu.mts
  *
- * Son turların zamanlarını ve aralarındaki boşlukları gösterir.
- * Boşluk 15 dakikadan çok büyükse cron duraklamış demektir.
+ * Not: Prisma'nın DateTime kolonları Postgres'te `timestamp without time zone`
+ * olarak duruyor. `pg` sürücüsü bunu yerel saat sanıp okuduğu için istemcide
+ * hesaplanan "kaç dakika önce" değeri saat dilimi kadar kayıyor. Bu yüzden
+ * bütün zaman farkları VERİTABANINDA hesaplanıyor.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -27,41 +29,46 @@ const c = new Client({ connectionString: baglantiAdresi(), ssl: { rejectUnauthor
 await c.connect();
 
 try {
-  const { rows } = await c.query<{ startedAt: Date; failureReason: string | null }>(
-    `SELECT "startedAt", "failureReason" FROM "WorkerRun" ORDER BY "startedAt" DESC LIMIT 12`,
-  );
+  const { rows } = await c.query<{
+    saat: string;
+    dk: string;
+    onceki_ara: string | null;
+    basarisiz: boolean;
+  }>(`
+    SELECT
+      to_char("startedAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Istanbul', 'DD.MM HH24:MI') AS saat,
+      ROUND(EXTRACT(EPOCH FROM (NOW() - "startedAt")) / 60)::text AS dk,
+      ROUND(EXTRACT(EPOCH FROM (
+        LAG("startedAt") OVER (ORDER BY "startedAt" DESC) - "startedAt"
+      )) / 60)::text AS onceki_ara,
+      ("failureReason" IS NOT NULL) AS basarisiz
+    FROM "WorkerRun"
+    ORDER BY "startedAt" DESC
+    LIMIT 12
+  `);
 
   if (rows.length === 0) {
     console.log("\nHiç tur kaydı yok — cron hiç çalışmamış.\n");
     process.exit(0);
   }
 
-  console.log("\n=== SON TURLAR (en yeni üstte) ===\n");
-
-  let oncekiZaman: number | null = null;
+  console.log("\n=== SON TURLAR (en yeni üstte, Türkiye saati) ===\n");
   for (const r of rows) {
-    const t = new Date(r.startedAt);
-    const gecen = Math.round((Date.now() - t.getTime()) / 60000);
-    const bosluk =
-      oncekiZaman === null ? "" : `  ↑ ${Math.round((oncekiZaman - t.getTime()) / 60000)} dk ara`;
-    const durum = r.failureReason ? "  BAŞARISIZ" : "";
-    console.log(
-      `  ${t.toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}  (${gecen} dk önce)${durum}${bosluk}`,
-    );
-    oncekiZaman = t.getTime();
+    const ara = r.onceki_ara ? `  ↑ ${r.onceki_ara} dk ara` : "";
+    const durum = r.basarisiz ? "  BAŞARISIZ" : "";
+    console.log(`  ${r.saat}  (${r.dk} dk önce)${durum}${ara}`);
   }
 
-  const sonGecen = Math.round((Date.now() - new Date(rows[0]!.startedAt).getTime()) / 60000);
+  const sonDk = Number(rows[0]!.dk);
   console.log("\n=== DEĞERLENDİRME ===\n");
-  if (sonGecen <= 20) {
-    console.log(`  Cron çalışıyor. Son tur ${sonGecen} dk önce.`);
+  if (sonDk <= 20) {
+    console.log(`  Cron çalışıyor. Son tur ${sonDk} dk önce.`);
   } else {
-    console.log(`  Cron DURMUŞ görünüyor. Son tur ${sonGecen} dk önce,`);
+    console.log(`  Cron durmuş olabilir: son tur ${sonDk} dk önce,`);
     console.log("  oysa 15 dakikada bir çalışması gerekiyor.");
     console.log("\n  Bakılacak yerler:");
-    console.log("   • cron-job.org → işin durumu 'Enabled' mı");
-    console.log("   • Son çalıştırma sonucu ne dönmüş (401 ise anahtar yanlış)");
-    console.log("   • cron-job.org art arda hata alan işleri kendiliğinden durdurabiliyor");
+    console.log("   • cron-job.org → iş 'Enabled' mı");
+    console.log("   • History sekmesinde son çalıştırmalar ne dönmüş");
   }
   console.log();
 } finally {

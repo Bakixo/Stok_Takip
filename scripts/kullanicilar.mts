@@ -46,9 +46,15 @@ function maskele(eposta: string): string {
   return `${bas}${"*".repeat(Math.max(3, ad.length - 2))}@${alan}`;
 }
 
-function geceSure(tarih: Date | null): string {
-  if (!tarih) return "—";
-  const dk = Math.floor((Date.now() - tarih.getTime()) / 60000);
+/**
+ * Dakika farkını okunur metne çevirir.
+ *
+ * Fark VERİTABANINDA hesaplanıyor: Prisma'nın DateTime kolonları Postgres'te
+ * `timestamp without time zone` olarak duruyor ve pg sürücüsü bunu yerel saat
+ * sanıp okuyor; istemcide hesaplarsak saat dilimi kadar kayıyor.
+ */
+function geceSure(dk: number | null): string {
+  if (dk === null) return "—";
   if (dk < 1) return "az önce";
   if (dk < 60) return `${dk} dk önce`;
   const sa = Math.floor(dk / 60);
@@ -71,16 +77,16 @@ try {
     aktif: string;
     bulundu: string;
     iptal: string;
-    ilk: Date;
-    son: Date | null;
+    ilk_dk: string;
+    son_dk: string | null;
   }>(`
     SELECT
       email,
       COUNT(*) FILTER (WHERE status = 'ACTIVE')    AS aktif,
       COUNT(*) FILTER (WHERE status = 'FOUND')     AS bulundu,
       COUNT(*) FILTER (WHERE status = 'CANCELLED') AS iptal,
-      MIN("createdAt")     AS ilk,
-      MAX("lastCheckedAt") AS son
+      ROUND(EXTRACT(EPOCH FROM (NOW() - MIN("createdAt"))) / 60)::text     AS ilk_dk,
+      ROUND(EXTRACT(EPOCH FROM (NOW() - MAX("lastCheckedAt"))) / 60)::text AS son_dk
     FROM "Watch"
     GROUP BY email
     ORDER BY MIN("createdAt")
@@ -93,7 +99,7 @@ try {
   } else {
     for (const k of kullanicilar) {
       console.log(`  ${maskele(k.email).padEnd(28)} aktif ${k.aktif} · bulundu ${k.bulundu} · iptal ${k.iptal}`);
-      console.log(`  ${" ".repeat(28)} ilk takip: ${geceSure(k.ilk)} · son kontrol: ${geceSure(k.son)}`);
+      console.log(`  ${" ".repeat(28)} ilk takip: ${geceSure(Number(k.ilk_dk))} · son kontrol: ${geceSure(k.son_dk === null ? null : Number(k.son_dk))}`);
       console.log();
     }
   }
@@ -110,18 +116,18 @@ try {
   const { rows: turlar } = await client.query<{
     toplam: string;
     basarisiz: string;
-    son: Date | null;
+    son_dk: string | null;
   }>(`
     SELECT COUNT(*) AS toplam,
            COUNT(*) FILTER (WHERE "failureReason" IS NOT NULL) AS basarisiz,
-           MAX("startedAt") AS son
+           ROUND(EXTRACT(EPOCH FROM (NOW() - MAX("startedAt"))) / 60)::text AS son_dk
     FROM "WorkerRun"
   `);
   const t = turlar[0]!;
   console.log("\n=== WORKER ===\n");
   console.log(`  toplam tur : ${t.toplam}`);
   console.log(`  başarısız  : ${t.basarisiz}`);
-  console.log(`  son tur    : ${geceSure(t.son)}`);
+  console.log(`  son tur    : ${geceSure(t.son_dk === null ? null : Number(t.son_dk))}`);
 
   // --- Son 24 saatteki kontroller ---
   const { rows: kontrol } = await client.query<{ result: string; adet: string }>(`
